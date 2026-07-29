@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>호마의 총알 피하기</title>
+  <style>
+    :root {
+      --bg: #050816;
+      --panel: rgba(10, 18, 42, 0.78);
+      --line: rgba(130, 236, 255, 0.25);
+      --cyan: #6ef3ff;
+      --blue: #5c7cff;
+      --pink: #ff4f91;
+      --yellow: #ffe66d;
+      --text: #eefcff;
+      --muted: #90a5c7;
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      width: 100%;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at 20% 10%, rgba(92,124,255,.18), transparent 35%),
+        radial-gradient(circle at 80% 85%, rgba(255,79,145,.12), transparent 40%),
+        var(--bg);
+      color: var(--text);
+      font-family: Inter, Pretendard, "Noto Sans KR", system-ui, sans-serif;
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+      padding: 14px;
+    }
+
+    .shell {
+      position: relative;
+      width: min(96vw, 920px);
+      height: min(92vh, 760px);
+      min-height: 520px;
+      border: 1px solid var(--line);
+      border-radius: 26px;
+      overflow: hidden;
+      background: rgba(4, 8, 22, .68);
+      box-shadow:
+        0 30px 100px rgba(0,0,0,.55),
+        inset 0 0 60px rgba(73, 117, 255, .06);
+      backdrop-filter: blur(12px);
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: crosshair;
+    }
+
+    .hud {
+      position: absolute;
+      inset: 18px 18px auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      pointer-events: none;
+      z-index: 3;
+      gap: 14px;
+    }
+
+    .brand {
+      font-size: 13px;
+      letter-spacing: .22em;
+      color: var(--cyan);
+      text-shadow: 0 0 18px rgba(110,243,255,.75);
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .stats {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .chip {
+      min-width: 92px;
+      padding: 9px 12px;
+      border-radius: 14px;
+      background: var(--panel);
+      border: 1px solid rgba(255,255,255,.08);
+      box-shadow: inset 0 0 20px rgba(110,243,255,.03);
+      text-align: center;
+    }
+
+    .chip small {
+      display: block;
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: .12em;
+      margin-bottom: 3px;
+    }
+
+    .chip strong {
+      font-size: 17px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .heart { color: var(--pink); }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 22px;
+      z-index: 5;
+      background: linear-gradient(rgba(3,7,20,.40), rgba(3,7,20,.72));
+      transition: opacity .25s ease;
+    }
+
+    .overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .card {
+      width: min(90%, 540px);
+      text-align: center;
+      padding: 34px 26px;
+      border-radius: 24px;
+      background: linear-gradient(145deg, rgba(10,20,49,.94), rgba(5,10,27,.92));
+      border: 1px solid rgba(110,243,255,.20);
+      box-shadow: 0 24px 80px rgba(0,0,0,.46), inset 0 0 44px rgba(92,124,255,.08);
+    }
+
+    .eyebrow {
+      font-size: 12px;
+      color: var(--cyan);
+      letter-spacing: .28em;
+      font-weight: 900;
+      margin-bottom: 10px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(38px, 7vw, 72px);
+      line-height: .95;
+      letter-spacing: -.055em;
+      text-shadow: 0 0 34px rgba(92,124,255,.45);
+    }
+
+    .subtitle {
+      color: var(--muted);
+      margin: 18px auto 24px;
+      line-height: 1.7;
+      font-size: 14px;
+      max-width: 410px;
+    }
+
+    .keys {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    kbd {
+      min-width: 42px;
+      padding: 9px 10px;
+      border-radius: 10px;
+      font: 800 12px inherit;
+      color: var(--text);
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.12);
+      box-shadow: 0 4px 0 rgba(0,0,0,.22);
+    }
+
+    .nickname-wrap { margin: 0 auto 14px; max-width: 330px; text-align: left; }
+    .nickname-wrap label { display:block; margin:0 0 7px 3px; font-size:11px; color:var(--muted); letter-spacing:.12em; }
+    .nickname-input { width:100%; border:1px solid rgba(110,243,255,.22); border-radius:14px; padding:13px 15px; background:rgba(255,255,255,.055); color:var(--text); font:800 15px inherit; outline:none; text-align:center; }
+    .nickname-input:focus { border-color:var(--cyan); box-shadow:0 0 0 3px rgba(110,243,255,.09); }
+    .rank-box { margin:20px auto 0; max-width:470px; padding:15px; border-radius:16px; background:rgba(0,0,0,.18); border:1px solid rgba(255,255,255,.07); }
+    .rank-title { font-weight:900; font-size:13px; letter-spacing:.12em; color:var(--cyan); margin-bottom:10px; }
+    .rank-table { width:100%; border-collapse:collapse; font-size:12px; }
+    .rank-table th { color:var(--muted); font-size:10px; font-weight:700; padding:6px 4px; }
+    .rank-table td { padding:7px 4px; border-top:1px solid rgba(255,255,255,.06); font-variant-numeric:tabular-nums; }
+    .rank-table td:nth-child(2) { text-align:left; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .rank-table th:not(:nth-child(2)), .rank-table td:not(:nth-child(2)) { text-align:center; }
+    .rank-status { color:var(--muted); font-size:11px; padding:8px; }
+
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 15px;
+      padding: 14px 25px;
+      font: 900 15px inherit;
+      color: #04101a;
+      background: linear-gradient(135deg, var(--cyan), #90ffcf);
+      box-shadow: 0 10px 30px rgba(110,243,255,.26);
+      cursor: pointer;
+      transition: transform .12s ease, filter .12s ease;
+    }
+
+    button:hover { transform: translateY(-2px); filter: brightness(1.05); }
+    button:active { transform: translateY(1px); }
+
+    .final-score {
+      margin: 16px 0 22px;
+      font-size: 28px;
+      font-weight: 900;
+      color: var(--yellow);
+    }
+
+    .footer-tip {
+      position: absolute;
+      z-index: 3;
+      left: 50%;
+      bottom: 14px;
+      transform: translateX(-50%);
+      font-size: 11px;
+      color: rgba(220,240,255,.55);
+      letter-spacing: .06em;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    .flash {
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      background: white;
+      pointer-events: none;
+      opacity: 0;
+    }
+
+    @media (max-width: 620px) {
+      body { padding: 0; }
+      .shell { width: 100vw; height: 100vh; min-height: 100vh; border-radius: 0; border: 0; }
+      .hud { inset: 12px 10px auto; }
+      .brand { font-size: 10px; }
+      .chip { min-width: 72px; padding: 7px 8px; }
+      .chip strong { font-size: 14px; }
+      .footer-tip { bottom: 10px; font-size: 10px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell" id="shell">
+    <canvas id="game"></canvas>
+
+    <div class="hud">
+      <div class="brand">HOMA BULLET DODGE</div>
+      <div class="stats">
+        <div class="chip"><small>SCORE</small><strong id="score">0</strong></div>
+        <div class="chip"><small>TIME</small><strong id="time">0.0</strong></div>
+        <div class="chip"><small>LIFE</small><strong class="heart" id="life">♥ ♥ ♥</strong></div>
+      </div>
+    </div>
+
+    <div class="overlay" id="startOverlay">
+      <section class="card">
+        <div class="eyebrow">SURVIVAL ARCADE</div>
+        <h1>호마의<br>총알 피하기</h1>
+        <p class="subtitle">
+          사방에서 날아오는 총알을 피하세요.<br>
+          오래 버틸수록 총알은 더 빠르고 많아집니다.
+        </p>
+        <div class="keys">
+          <kbd>WASD</kbd><kbd>방향키</kbd><kbd>마우스</kbd><kbd>터치</kbd>
+        </div>
+        <div class="nickname-wrap">
+          <label for="nickname">PLAYER NICKNAME</label>
+          <input id="nickname" class="nickname-input" maxlength="12" autocomplete="off" placeholder="닉네임을 입력하세요" />
+        </div>
+        <button id="startBtn">게임 시작</button>
+        <div class="rank-box">
+          <div class="rank-title">TOP 10 RANKING</div>
+          <div id="startRanking" class="rank-status">랭킹 불러오는 중…</div>
+        </div>
+      </section>
+    </div>
+
+    <div class="overlay hidden" id="gameOverOverlay">
+      <section class="card">
+        <div class="eyebrow">MISSION FAILED</div>
+        <h1>GAME<br>OVER</h1>
+        <div class="final-score" id="finalScore">0점</div>
+        <p class="subtitle" id="bestText">기록을 저장하는 중…</p>
+        <button id="restartBtn">다시 도전</button>
+        <div class="rank-box">
+          <div class="rank-title">TOP 10 RANKING</div>
+          <div id="gameOverRanking" class="rank-status">랭킹 불러오는 중…</div>
+        </div>
+      </section>
+    </div>
+
+    <div class="flash" id="flash"></div>
+    <div class="footer-tip">Shift 또는 Space: 순간 대시 · 대시 중 무적</div>
+  </main>
+
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const shell = document.getElementById('shell');
+  const scoreEl = document.getElementById('score');
+  const timeEl = document.getElementById('time');
+  const lifeEl = document.getElementById('life');
+  const startOverlay = document.getElementById('startOverlay');
+  const gameOverOverlay = document.getElementById('gameOverOverlay');
+  const finalScore = document.getElementById('finalScore');
+  const bestText = document.getElementById('bestText');
+  const flash = document.getElementById('flash');
+  const nicknameInput = document.getElementById('nickname');
+  const startRanking = document.getElementById('startRanking');
+  const gameOverRanking = document.getElementById('gameOverRanking');
+  let nickname = localStorage.getItem('homaNickname') || '';
+  nicknameInput.value = nickname;
+
+  let W = 0, H = 0, dpr = 1;
+  let running = false;
+  let last = 0;
+  let elapsed = 0;
+  let score = 0;
+  let spawnTimer = 0;
+  let particles = [];
+  let bullets = [];
+  let stars = [];
+  let shake = 0;
+
+  const keys = {};
+  const pointer = { x: 0, y: 0, active: false };
+
+  const player = {
+    x: 0, y: 0, r: 12, speed: 290,
+    lives: 3, invincible: 0,
+    dashCooldown: 0, dashTime: 0,
+    vx: 0, vy: 0
+  };
+
+  function resize() {
+    const rect = shell.getBoundingClientRect();
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = rect.width;
+    H = rect.height;
+    canvas.width = Math.floor(W * dpr);
+    canvas.height = Math.floor(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (!running) {
+      player.x = W / 2;
+      player.y = H * .68;
+    }
+    makeStars();
+  }
+
+  function makeStars() {
+    const count = Math.floor((W * H) / 9000);
+    stars = Array.from({ length: count }, () => ({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      r: Math.random() * 1.4 + .2,
+      a: Math.random() * .65 + .15,
+      s: Math.random() * 10 + 4
+    }));
+  }
+
+  function reset() {
+    elapsed = 0;
+    score = 0;
+    spawnTimer = 0;
+    bullets = [];
+    particles = [];
+    shake = 0;
+    player.x = W / 2;
+    player.y = H * .68;
+    player.lives = 3;
+    player.invincible = 1.2;
+    player.dashCooldown = 0;
+    player.dashTime = 0;
+    player.vx = 0;
+    player.vy = 0;
+    scoreEl.textContent = '0';
+    timeEl.textContent = '0.0';
+    lifeEl.textContent = '♥ ♥ ♥';
+  }
+
+  function startGame() {
+    const entered = nicknameInput.value.trim();
+    if (!entered) {
+      nicknameInput.focus();
+      nicknameInput.animate([{transform:'translateX(-5px)'},{transform:'translateX(5px)'},{transform:'translateX(0)'}], {duration:220});
+      return;
+    }
+    nickname = entered.slice(0, 12);
+    nicknameInput.value = nickname;
+    localStorage.setItem('homaNickname', nickname);
+    reset();
+    startOverlay.classList.add('hidden');
+    gameOverOverlay.classList.add('hidden');
+    running = true;
+    last = performance.now();
+    requestAnimationFrame(loop);
+  }
+
+  async function endGame() {
+    running = false;
+    const finalPoints = Math.floor(score);
+    finalScore.textContent = `${finalPoints.toLocaleString()}점`;
+    bestText.textContent = `${nickname} · 생존 ${elapsed.toFixed(1)}초 · 서버 저장 중…`;
+    gameOverOverlay.classList.remove('hidden');
+
+    try {
+      const res = await fetch('/api/rankings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ nickname, score: finalPoints, survival_time: Number(elapsed.toFixed(1)) })
+      });
+      if (!res.ok) throw new Error('save failed');
+      const data = await res.json();
+      bestText.textContent = `${nickname} · ${data.rank}위 · 생존 ${elapsed.toFixed(1)}초`;
+    } catch (e) {
+      bestText.textContent = `${nickname} · 생존 ${elapsed.toFixed(1)}초 · 기록 저장 실패`;
+    }
+    loadRankings();
+  }
+
+  function rankingMarkup(rows) {
+    if (!rows.length) return '<div class="rank-status">아직 등록된 기록이 없습니다.</div>';
+    return `<table class="rank-table"><thead><tr><th>순위</th><th>닉네임</th><th>점수</th><th>생존</th></tr></thead><tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${escapeHtml(r.nickname)}</td><td>${Number(r.score).toLocaleString()}</td><td>${Number(r.survival_time).toFixed(1)}초</td></tr>`).join('')}</tbody></table>`;
+  }
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+  }
+
+  async function loadRankings() {
+    try {
+      const res = await fetch('/api/rankings?limit=10', {cache:'no-store'});
+      if (!res.ok) throw new Error('load failed');
+      const rows = await res.json();
+      const html = rankingMarkup(rows);
+      startRanking.innerHTML = html;
+      gameOverRanking.innerHTML = html;
+    } catch (e) {
+      const msg = '<div class="rank-status">서버에 연결할 수 없습니다.</div>';
+      startRanking.innerHTML = msg;
+      gameOverRanking.innerHTML = msg;
+    }
+  }
+
+  function dash() {
+    if (!running || player.dashCooldown > 0) return;
+
+    let dx = 0, dy = 0;
+    if (keys['ArrowLeft'] || keys['a']) dx -= 1;
+    if (keys['ArrowRight'] || keys['d']) dx += 1;
+    if (keys['ArrowUp'] || keys['w']) dy -= 1;
+    if (keys['ArrowDown'] || keys['s']) dy += 1;
+
+    if (pointer.active) {
+      dx = pointer.x - player.x;
+      dy = pointer.y - player.y;
+    }
+
+    const len = Math.hypot(dx, dy) || 1;
+    player.vx = dx / len;
+    player.vy = dy / len;
+    player.dashTime = .15;
+    player.dashCooldown = 1.5;
+    player.invincible = Math.max(player.invincible, .25);
+
+    burst(player.x, player.y, '#6ef3ff', 18, 180);
+  }
+
+  function spawnBullet() {
+    const side = Math.floor(Math.random() * 4);
+    const margin = 30;
+    let x, y;
+
+    if (side === 0) { x = Math.random() * W; y = -margin; }
+    if (side === 1) { x = W + margin; y = Math.random() * H; }
+    if (side === 2) { x = Math.random() * W; y = H + margin; }
+    if (side === 3) { x = -margin; y = Math.random() * H; }
+
+    const difficulty = 1 + elapsed / 24;
+    const aimNoise = Math.max(.05, .35 - elapsed / 150);
+    const targetX = player.x + (Math.random() - .5) * W * aimNoise;
+    const targetY = player.y + (Math.random() - .5) * H * aimNoise;
+    const angle = Math.atan2(targetY - y, targetX - x);
+    const speed = (105 + Math.random() * 75) * Math.min(2.7, difficulty);
+    const radius = Math.max(4.5, 8 - elapsed / 55 + Math.random() * 3);
+
+    bullets.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      r: radius,
+      hue: Math.random() < .15 ? 50 : 344,
+      near: false,
+      trail: []
+    });
+
+    if (elapsed > 18 && Math.random() < Math.min(.5, elapsed / 100)) {
+      const spread = .14 + Math.random() * .13;
+      for (const dir of [-1, 1]) {
+        const a = angle + spread * dir;
+        bullets.push({
+          x, y,
+          vx: Math.cos(a) * speed * .92,
+          vy: Math.sin(a) * speed * .92,
+          r: radius * .88,
+          hue: 195,
+          near: false,
+          trail: []
+        });
+      }
+    }
+  }
+
+  function burst(x, y, color, count = 12, speed = 110) {
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const s = Math.random() * speed;
+      particles.push({
+        x, y,
+        vx: Math.cos(a) * s,
+        vy: Math.sin(a) * s,
+        life: Math.random() * .45 + .25,
+        max: .7,
+        size: Math.random() * 3 + 1,
+        color
+      });
+    }
+  }
+
+  function hitPlayer() {
+    if (player.invincible > 0 || player.dashTime > 0) return;
+    player.lives--;
+    player.invincible = 1.25;
+    shake = 14;
+    flash.animate([{opacity: .65}, {opacity: 0}], {duration: 260});
+    burst(player.x, player.y, '#ff4f91', 34, 260);
+    lifeEl.textContent = Array(player.lives).fill('♥').join(' ') || '—';
+
+    bullets = bullets.filter(b => Math.hypot(b.x - player.x, b.y - player.y) > 130);
+
+    if (player.lives <= 0) endGame();
+  }
+
+  function update(dt) {
+    elapsed += dt;
+    score += dt * (20 + elapsed * .9);
+    player.invincible = Math.max(0, player.invincible - dt);
+    player.dashCooldown = Math.max(0, player.dashCooldown - dt);
+    player.dashTime = Math.max(0, player.dashTime - dt);
+    shake = Math.max(0, shake - dt * 34);
+
+    for (const s of stars) {
+      s.y += s.s * dt * (1 + elapsed / 80);
+      if (s.y > H + 5) { s.y = -5; s.x = Math.random() * W; }
+    }
+
+    let dx = 0, dy = 0;
+    if (keys['ArrowLeft'] || keys['a']) dx -= 1;
+    if (keys['ArrowRight'] || keys['d']) dx += 1;
+    if (keys['ArrowUp'] || keys['w']) dy -= 1;
+    if (keys['ArrowDown'] || keys['s']) dy += 1;
+
+    if (pointer.active) {
+      dx = pointer.x - player.x;
+      dy = pointer.y - player.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 5) { dx = 0; dy = 0; }
+    }
+
+    const len = Math.hypot(dx, dy) || 1;
+    const moveSpeed = player.dashTime > 0 ? 850 : player.speed;
+    player.x += (dx / len) * moveSpeed * dt;
+    player.y += (dy / len) * moveSpeed * dt;
+
+    player.x = Math.max(player.r + 8, Math.min(W - player.r - 8, player.x));
+    player.y = Math.max(player.r + 52, Math.min(H - player.r - 24, player.y));
+
+    spawnTimer -= dt;
+    const interval = Math.max(.105, .74 - elapsed * .009);
+    if (spawnTimer <= 0) {
+      spawnBullet();
+      if (elapsed > 35 && Math.random() < .24) spawnBullet();
+      spawnTimer = interval * (.75 + Math.random() * .5);
+    }
+
+    for (const b of bullets) {
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      b.trail.push({x: b.x, y: b.y});
+      if (b.trail.length > 7) b.trail.shift();
+
+      const dist = Math.hypot(b.x - player.x, b.y - player.y);
+      if (dist < b.r + player.r - 2) {
+        hitPlayer();
+        b.dead = true;
+      } else if (!b.near && dist < b.r + player.r + 22) {
+        b.near = true;
+        score += 75;
+        burst(b.x, b.y, '#ffe66d', 5, 55);
+      }
+    }
+
+    bullets = bullets.filter(b =>
+      !b.dead &&
+      b.x > -100 && b.x < W + 100 &&
+      b.y > -100 && b.y < H + 100
+    );
+
+    for (const p of particles) {
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vx *= .985;
+      p.vy *= .985;
+      p.life -= dt;
+    }
+    particles = particles.filter(p => p.life > 0);
+
+    scoreEl.textContent = Math.floor(score).toLocaleString();
+    timeEl.textContent = elapsed.toFixed(1);
+  }
+
+  function drawGrid() {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(90,150,255,.055)';
+    ctx.lineWidth = 1;
+    const size = 42;
+    const off = (elapsed * 12) % size;
+    for (let x = -size; x < W + size; x += size) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, H);
+      ctx.stroke();
+    }
+    for (let y = -size + off; y < H + size; y += size) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(W, y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    const sx = shake ? (Math.random() - .5) * shake : 0;
+    const sy = shake ? (Math.random() - .5) * shake : 0;
+    ctx.save();
+    ctx.translate(sx, sy);
+
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, '#071027');
+    bg.addColorStop(1, '#030612');
+    ctx.fillStyle = bg;
+    ctx.fillRect(-20, -20, W + 40, H + 40);
+
+    drawGrid();
+
+    for (const s of stars) {
+      ctx.globalAlpha = s.a;
+      ctx.fillStyle = '#dffcff';
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    for (const b of bullets) {
+      for (let i = 0; i < b.trail.length; i++) {
+        const t = b.trail[i];
+        const alpha = (i / b.trail.length) * .18;
+        ctx.fillStyle = `hsla(${b.hue}, 100%, 65%, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, b.r * (i / b.trail.length) * .7, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = `hsl(${b.hue},100%,60%)`;
+      const g = ctx.createRadialGradient(b.x - b.r*.3, b.y - b.r*.3, 1, b.x, b.y, b.r);
+      g.addColorStop(0, '#fff');
+      g.addColorStop(.25, `hsl(${b.hue},100%,78%)`);
+      g.addColorStop(1, `hsl(${b.hue},95%,47%)`);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+
+    for (const p of particles) {
+      ctx.globalAlpha = Math.max(0, p.life / p.max);
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    const flicker = player.invincible > 0 && Math.floor(player.invincible * 12) % 2 === 0;
+    if (!flicker) {
+      ctx.save();
+      ctx.translate(player.x, player.y);
+      ctx.rotate(Math.atan2(player.vy || -1, player.vx || 0) + Math.PI / 2);
+      ctx.shadowBlur = 28;
+      ctx.shadowColor = player.dashTime > 0 ? '#ffffff' : '#6ef3ff';
+
+      if (player.dashTime > 0) {
+        ctx.fillStyle = 'rgba(110,243,255,.22)';
+        ctx.beginPath();
+        ctx.ellipse(0, 18, 13, 38, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      const ship = ctx.createLinearGradient(0, -18, 0, 18);
+      ship.addColorStop(0, '#ffffff');
+      ship.addColorStop(.5, '#6ef3ff');
+      ship.addColorStop(1, '#5c7cff');
+      ctx.fillStyle = ship;
+      ctx.beginPath();
+      ctx.moveTo(0, -18);
+      ctx.lineTo(13, 13);
+      ctx.lineTo(0, 7);
+      ctx.lineTo(-13, 13);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#071027';
+      ctx.beginPath();
+      ctx.arc(0, -2, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    if (player.invincible > 0) {
+      ctx.strokeStyle = `rgba(110,243,255,${.25 + Math.sin(elapsed * 18) * .15})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(player.x, player.y, player.r + 8, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // Dash cooldown bar
+    const bw = 120, bh = 5;
+    const bx = W / 2 - bw / 2, by = H - 34;
+    ctx.fillStyle = 'rgba(255,255,255,.08)';
+    ctx.fillRect(bx, by, bw, bh);
+    const ready = 1 - Math.min(1, player.dashCooldown / 1.5);
+    const grad = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+    grad.addColorStop(0, '#5c7cff');
+    grad.addColorStop(1, '#6ef3ff');
+    ctx.fillStyle = grad;
+    ctx.fillRect(bx, by, bw * ready, bh);
+
+    ctx.restore();
+  }
+
+  function loop(now) {
+    if (!running) return;
+    const dt = Math.min(.033, (now - last) / 1000);
+    last = now;
+    update(dt);
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  window.addEventListener('resize', resize);
+  window.addEventListener('keydown', e => {
+    const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    keys[key] = true;
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+    if (e.key === ' ' || e.key === 'Shift') dash();
+    if (!running && (e.key === 'Enter' || e.key === ' ')) startGame();
+  });
+  window.addEventListener('keyup', e => {
+    const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    keys[key] = false;
+  });
+
+  function setPointer(e) {
+    const rect = canvas.getBoundingClientRect();
+    const p = e.touches ? e.touches[0] : e;
+    pointer.x = p.clientX - rect.left;
+    pointer.y = p.clientY - rect.top;
+    pointer.active = true;
+  }
+
+  canvas.addEventListener('mousemove', e => {
+    if (e.buttons) setPointer(e);
+  });
+  canvas.addEventListener('mousedown', e => setPointer(e));
+  window.addEventListener('mouseup', () => pointer.active = false);
+  canvas.addEventListener('touchstart', e => {
+    setPointer(e);
+    if (e.touches.length >= 2) dash();
+  }, {passive:false});
+  canvas.addEventListener('touchmove', e => setPointer(e), {passive:false});
+  canvas.addEventListener('touchend', () => pointer.active = false);
+
+  document.getElementById('startBtn').addEventListener('click', startGame);
+  document.getElementById('restartBtn').addEventListener('click', startGame);
+
+  nicknameInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') startGame();
+    e.stopPropagation();
+  });
+  resize();
+  draw();
+  loadRankings();
+})();
+</script>
+</body>
+</html>
