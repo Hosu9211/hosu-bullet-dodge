@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>호마의 총알 피하기</title>
+  <title>호수의 총알 피하기</title>
   <style>
     :root{
       --bg:#06101f; --panel:#0b1730; --line:rgba(99,221,255,.28);
@@ -128,7 +128,7 @@
   <canvas id="canvas"></canvas>
 
   <div class="topbar">
-    <div class="brand">HOMA BULLET DODGE</div>
+    <div class="brand">HOSU BULLET DODGE</div>
     <div class="stats">
       <div class="stat"><span>SCORE</span><strong id="scoreText">0</strong></div>
       <div class="stat"><span>TIME</span><strong id="timeText">0.0</strong></div>
@@ -139,15 +139,15 @@
   <div id="startOverlay" class="overlay">
     <div class="card">
       <div class="eyebrow">SURVIVAL ARCADE</div>
-      <h1>호마의<br>총알 피하기</h1>
+      <h1>호수의<br>총알 피하기</h1>
       <p class="subtitle">
         사방에서 날아오는 총알을 피하세요.<br>
         시간이 지날수록 총알의 속도와 수가 빠르게 증가합니다.
       </p>
       <div class="controls">
         <div class="pill">WASD</div><div class="pill">방향키</div>
-        <div class="pill">마우스</div><div class="pill">터치</div>
-        <div class="pill">Shift / Space 대시</div>
+        <div class="pill">마우스 드래그</div><div class="pill">터치 드래그</div>
+        <div class="pill">즉각 반응 이동</div>
       </div>
 
       <label for="nicknameInput">PLAYER NICKNAME</label>
@@ -168,7 +168,7 @@
     </div>
   </div>
 
-  <div class="footer-tip">Shift 또는 Space: 순간 대시 · 대시 중 잠시 무적</div>
+  <div class="footer-tip">WASD / 방향키: 즉시 이동 · 마우스 / 터치: 드래그한 만큼 1:1 이동</div>
 </div>
 
 <script>
@@ -196,10 +196,16 @@
   const stars = [];
 
   const player = {
-    x:0, y:0, r:10, speed:270, lives:3,
-    invincible:0, dashCooldown:0, dashTime:0,
-    targetX:null, targetY:null
+    x:0, y:0, r:10, speed:480, lives:3,
+    invincible:0
   };
+
+  // 마우스/터치는 목표점을 따라가는 방식이 아니라,
+  // 사용자가 실제로 드래그한 거리만큼 플레이어를 즉시 이동시킵니다.
+  let pointerActive = false;
+  let activePointerId = null;
+  let pointerLastX = 0;
+  let pointerLastY = 0;
 
   function resize(){
     dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -228,10 +234,8 @@
     player.y = H/2;
     player.lives = 3;
     player.invincible = 1.1;
-    player.dashCooldown = 0;
-    player.dashTime = 0;
-    player.targetX = null;
-    player.targetY = null;
+    pointerActive = false;
+    activePointerId = null;
     updateHUD();
   }
 
@@ -296,21 +300,6 @@
     });
   }
 
-  function dash(){
-    if (!running || player.dashCooldown>0) return;
-    player.dashCooldown = 1.6;
-    player.dashTime = .18;
-    player.invincible = Math.max(player.invincible,.22);
-
-    for(let i=0;i<18;i++){
-      particles.push({
-        x:player.x,y:player.y,
-        vx:(Math.random()-.5)*220,vy:(Math.random()-.5)*220,
-        life:.35+Math.random()*.25,max:.6,r:2+Math.random()*3
-      });
-    }
-  }
-
   function hitPlayer(){
     if (player.invincible>0) return;
     player.lives--;
@@ -328,32 +317,30 @@
     if(player.lives<=0) endGame();
   }
 
+  function clampPlayer(){
+    player.x = Math.max(player.r, Math.min(W-player.r, player.x));
+    player.y = Math.max(player.r, Math.min(H-player.r, player.y));
+  }
+
   function update(dt){
     elapsed += dt;
     score += dt * (24 + elapsed * 1.35);
 
     player.invincible = Math.max(0, player.invincible-dt);
-    player.dashCooldown = Math.max(0, player.dashCooldown-dt);
-    player.dashTime = Math.max(0, player.dashTime-dt);
 
+    // 키보드: 가속/감속 없이 누르는 즉시 최고 속도로 이동하고, 떼는 즉시 정지합니다.
     let dx=0,dy=0;
     if(keys['arrowleft']||keys['a']) dx--;
     if(keys['arrowright']||keys['d']) dx++;
     if(keys['arrowup']||keys['w']) dy--;
     if(keys['arrowdown']||keys['s']) dy++;
 
-    if(player.targetX!==null){
-      const tx=player.targetX-player.x, ty=player.targetY-player.y;
-      const dist=Math.hypot(tx,ty);
-      if(dist>8){dx=tx/dist;dy=ty/dist}
+    if(dx!==0 || dy!==0){
+      const len=Math.hypot(dx,dy);
+      player.x += (dx/len)*player.speed*dt;
+      player.y += (dy/len)*player.speed*dt;
+      clampPlayer();
     }
-
-    const len=Math.hypot(dx,dy)||1;
-    const boost = player.dashTime>0 ? 2.65 : 1;
-    player.x += (dx/len)*player.speed*boost*dt;
-    player.y += (dy/len)*player.speed*boost*dt;
-    player.x = Math.max(player.r,Math.min(W-player.r,player.x));
-    player.y = Math.max(player.r,Math.min(H-player.r,player.y));
 
     spawnTimer -= dt;
     const interval = Math.max(.05, .64 - elapsed * .018);
@@ -463,18 +450,57 @@
   window.addEventListener('resize',resize);
   window.addEventListener('keydown',e=>{
     const k=e.key.toLowerCase();
-    keys[k]=true;
-    if(k===' '||k==='shift'){e.preventDefault();dash()}
+    if(['arrowleft','arrowright','arrowup','arrowdown','w','a','s','d'].includes(k)){
+      e.preventDefault();
+      keys[k]=true;
+    }
   });
-  window.addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+  window.addEventListener('keyup',e=>{
+    const k=e.key.toLowerCase();
+    if(['arrowleft','arrowright','arrowup','arrowdown','w','a','s','d'].includes(k)){
+      keys[k]=false;
+    }
+  });
+  window.addEventListener('blur',()=>{
+    for(const k in keys) keys[k]=false;
+    pointerActive=false;
+    activePointerId=null;
+  });
 
   canvas.addEventListener('pointerdown',e=>{
-    player.targetX=e.clientX;player.targetY=e.clientY;
+    if(!running) return;
+    pointerActive=true;
+    activePointerId=e.pointerId;
+    pointerLastX=e.clientX;
+    pointerLastY=e.clientY;
+    if(canvas.setPointerCapture) canvas.setPointerCapture(e.pointerId);
+    e.preventDefault();
   });
+
   canvas.addEventListener('pointermove',e=>{
-    if(e.buttons||e.pointerType==='touch'){player.targetX=e.clientX;player.targetY=e.clientY}
+    if(!running || !pointerActive || e.pointerId!==activePointerId) return;
+
+    // 포인터가 움직인 거리와 같은 만큼 즉시 이동 (속도 제한/추적 지연 없음)
+    const moveX=e.clientX-pointerLastX;
+    const moveY=e.clientY-pointerLastY;
+    player.x += moveX;
+    player.y += moveY;
+    clampPlayer();
+
+    pointerLastX=e.clientX;
+    pointerLastY=e.clientY;
+    e.preventDefault();
   });
-  canvas.addEventListener('pointerup',()=>{player.targetX=null;player.targetY=null});
+
+  function releasePointer(e){
+    if(e && activePointerId!==null && e.pointerId!==activePointerId) return;
+    pointerActive=false;
+    activePointerId=null;
+  }
+
+  canvas.addEventListener('pointerup',releasePointer);
+  canvas.addEventListener('pointercancel',releasePointer);
+  canvas.addEventListener('lostpointercapture',releasePointer);
 
   startBtn.addEventListener('click',startGame);
   retryBtn.addEventListener('click',()=>{
